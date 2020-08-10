@@ -5,11 +5,10 @@ dependencies:
   - python=3.7
   - pip
   - pip:
-    - streamlit
-    - black
-    - flake8
-    - pandas
-    - numpy
-    - python-dateutil
-    - pydeck
-    - python-dotenv
+      - streamlit
+      - streamlit-folium
+      - black
+      - flake8
+      - pandas
+      - numpy
+      - python-dateutil

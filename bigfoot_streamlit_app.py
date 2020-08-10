@@ -1,21 +1,10 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
-import pydeck as pdk
-import os
+import folium
 
+from streamlit_folium import folium_static
 from dateutil.parser import parse
-
-try:
-    from dotenv import load_dotenv, find_dotenv
-
-    load_dotenv(find_dotenv())
-except ImportError:
-    print("python-dotenv is not installed.")
-    print("I'll still look for the mapbox token in the environment.")
-
-
-MAPBOX_KEY = os.environ.get("MAPBOX_KEY", "")
 
 
 # This is by far the slowest operation in the whole app. Caching it means
@@ -28,7 +17,20 @@ def load_data():
     dataset.loc[:, "timestamp"] = dataset.timestamp.apply(parse)
     dataset.loc[:, "year"] = dataset.timestamp.dt.year
     # yes there are sightings from the future.
-    return dataset.query("year<=2020")
+    return (
+        dataset.query("year<=2020")
+        .query("longitude>=-180 & longitude<=180")
+        .query("latitude>=-90 & latitude<=90")
+    )
+
+
+def select_color(classification):
+    if classification == "Class A":
+        return "red"
+    elif classification == "Class B":
+        return "orange"
+    else:
+        return "blue"
 
 
 st.title("Bigfoot Sightings")
@@ -65,39 +67,30 @@ if text:
     filtered_sightings = filtered_sightings.query("title.str.contains(@text)")
 
 
-# Next up are the plots. If there's no mapbox key we can skip this one but
-# you really want it cause it's an awesome map.
-# This is not clear in streamlit's docs: they make it seem like the key is
-# optional, but it isn't. It straight up won't work without it.
-# Or if it is optional I couldn't figure it out.
-if MAPBOX_KEY:
-    # I used the "lower level" pydeck to build this even though it's not
-    # a complicated map because I could not get streamlit.map( ... ) to work at
-    # all. It just showed blank tiles.
-    deck = pdk.Deck(
-        initial_view_state=pdk.ViewState(
-            latitude=39.5, longitude=-97.35, zoom=3
-        ),
-        map_style="mapbox://styles/mapbox/outdoors-v11",
-        layers=[
-            pdk.Layer(
-                "HexagonLayer",
-                data=filtered_sightings[["longitude", "latitude"]],
-                get_position=["longitude", "latitude"],
-                elevation_range=[0, 1000],
-                coverage=1,
-                radius=25000,
-                pickable=True,
-                opacity=0.5,
-            )
-        ],
-    )
+# Next up are the plots. Originally this was a pydeck chart but now there's a
+# streamlit plugin for Folium, which is awful to work with but at least it's
+# free.
 
-    st.pydeck_chart(deck)
-else:
-    st.write(
-        "Unable to find a Mapbox key. Deck.gl chart won't work without it."
-    )
+m = folium.Map(
+    location=[
+        filtered_sightings.latitude.mean(),
+        filtered_sightings.longitude.mean(),
+    ],
+    zoom_start=4,
+    tiles="cartodbpositron",
+)
+for _, row in filtered_sightings.iterrows():
+    folium.Circle(
+        radius=1000,
+        location=[row.latitude, row.longitude],
+        tooltip=row.title,
+        fill=True,
+        color=select_color(row.classification),
+        opacity=0.5,
+    ).add_to(m)
+
+
+folium_static(m)
 
 # I had a hard time getting st.line_chart to do what I want, but Altair was
 # pretty simple to learn. I really like that Altair does those simple
