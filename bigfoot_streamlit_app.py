@@ -7,13 +7,15 @@ from streamlit_folium import folium_static
 from dateutil.parser import parse
 
 
+SIGHTINGS_FILE = "https://raw.githubusercontent.com/timothyrenner/bigfoot-dash-app/master/data/bfro_report_locations.csv"
+
 # This is by far the slowest operation in the whole app. Caching it means
 # that it won't re-execute. And since the data itself never really changes
 # for the duration of the app, the cache will almost never become invalid
 # unless you change the code of this function.
 @st.cache
 def load_data():
-    dataset = pd.read_csv("bfro_report_locations.csv")
+    dataset = pd.read_csv(SIGHTINGS_FILE)
     dataset.loc[:, "timestamp"] = dataset.timestamp.apply(parse)
     dataset.loc[:, "year"] = dataset.timestamp.dt.year
     # yes there are sightings from the future.
